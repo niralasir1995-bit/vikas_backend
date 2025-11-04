@@ -51,7 +51,6 @@ app.use(
 /** ✅ Body parsers */
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, "../vikas_frontend/dist")));
 
 /** ✅ Routes */
 app.use("/api/auth", authRoutes);
