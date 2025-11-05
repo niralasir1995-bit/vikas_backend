@@ -149,7 +149,8 @@ router.post("/forgot-password", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ msg: "User not found" });
 
- const user = new User({ ...req.body, role, child: child ? child._id : null });
+user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
 
 
     return res.json({ msg: "Password updated successfully" });
