@@ -79,11 +79,18 @@ app.use(errorHandler);
 
 /** ✅ MongoDB connection */
 mongoose.set("strictQuery", true);
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => {
-    console.error("❌ Mongo error:", err);
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is missing!');
+  console.log('Please set MONGODB_URI in Render environment variables');
+  process.exit(1);
+}
+
+mongoose.connect(MONGODB_URI)
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch(err => {
+    console.error('❌ MongoDB connection error:', err.message);
     process.exit(1);
   });
 
