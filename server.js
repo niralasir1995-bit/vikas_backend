@@ -3,7 +3,6 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-require('dotenv').config();
 
 // Import routes
 const authRoutes = require("./routes/auth");
@@ -26,17 +25,7 @@ const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
-/** ✅ CORS — allow dev & prod frontends */
-const allowedOrigins = [
-   "http://localhost:5173",   // Vite dev
-  "http://localhost:3000",   // React dev
-  "http://10.0.2.2:3000",    // Android emulator accessing local
-  "http://10.0.2.2:4000",    // Android emulator backend direct
-  "http://192.168.1.100:3000", // LAN IP (replace with your PC's IP)
-  "http://192.168.1.100:4000",
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
+/** ✅ CORS */
 app.use(
   cors({
     origin: [
@@ -52,6 +41,49 @@ app.use(
 /** ✅ Body parsers */
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+/** ✅ MongoDB connection - IMPROVED */
+console.log('🔧 Checking MongoDB configuration...');
+
+// Check both MONGODB_URI and MONGODB_URL
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGODB_URL;
+
+console.log('MONGODB_URI exists:', !!process.env.MONGODB_URI);
+console.log('MONGODB_URL exists:', !!process.env.MONGODB_URL);
+
+if (!MONGODB_URI) {
+  console.error('❌ CRITICAL: MongoDB connection string missing!');
+  console.log('💡 Please set MONGODB_URI in Render environment variables');
+  console.log('📋 Expected format: mongodb+srv://username:password@cluster0.xxx.mongodb.net/database');
+  process.exit(1);
+}
+
+// Validate connection string format
+if (!MONGODB_URI.startsWith('mongodb')) {
+  console.error('❌ INVALID MongoDB connection string format!');
+  console.log('🔍 Your connection string:', MONGODB_URI);
+  console.log('💡 It should start with "mongodb+srv://"');
+  process.exit(1);
+}
+
+console.log('🔗 Attempting MongoDB connection...');
+
+mongoose.set("strictQuery", false);
+
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  console.log('✅ MongoDB connected successfully');
+  console.log('📊 Database:', mongoose.connection.name);
+})
+.catch(err => {
+  console.error('❌ MongoDB connection FAILED:');
+  console.error('Error:', err.message);
+  console.log('🔍 Connection string used:', MONGODB_URI.replace(/:[^:]*@/, ':****@')); // Hide password
+  process.exit(1);
+});
 
 /** ✅ Routes */
 app.use("/api/auth", authRoutes);
@@ -71,28 +103,20 @@ app.use("/uploads", express.static("uploads"));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/admin", require("./routes/admin"));
-app.use("/api/public", publicRoutes)
+app.use("/api/public", publicRoutes);
 
-/** ✅ Error handling (must be last) */
+// Test route
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "Server is running!",
+    database: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
+    timestamp: new Date().toISOString()
+  });
+});
+
+/** ✅ Error handling */
 app.use(notFound);
 app.use(errorHandler);
-
-/** ✅ MongoDB connection */
-mongoose.set("strictQuery", true);
-const MONGODB_URI = process.env.MONGODB_URI;
-
-if (!MONGODB_URI) {
-  console.error('❌ MONGODB_URI environment variable is missing!');
-  console.log('Please set MONGODB_URI in Render environment variables');
-  process.exit(1);
-}
-
-mongoose.connect(MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected successfully'))
-  .catch(err => {
-    console.error('❌ MongoDB connection error:', err.message);
-    process.exit(1);
-  });
 
 /** ✅ Graceful shutdown */
 process.on("SIGINT", async () => {
@@ -103,6 +127,7 @@ process.on("SIGINT", async () => {
 
 /** ✅ Start server */
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server running on ${PORT}`));
-
-module.exports = app;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
